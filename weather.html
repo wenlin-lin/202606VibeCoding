@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新北天氣</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans TC', system-ui, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(145deg, #0b1a33 0%, #1a3a5c 40%, #2d5a7b 100%);
+    color: #fff;
+    padding: 32px 16px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 680px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .header h1 small {
+    font-weight: 400;
+    font-size: 14px;
+    opacity: .6;
+    margin-left: 8px;
+  }
+  .select-wrap {
+    position: relative;
+  }
+  .select-wrap select {
+    appearance: none;
+    padding: 10px 36px 10px 16px;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 15px;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    min-width: 140px;
+    transition: background .2s;
+  }
+  .select-wrap select:hover { background: rgba(255,255,255,.16); }
+  .select-wrap select option { color: #000; background: #fff; }
+  .select-wrap::after {
+    content: '▾';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    opacity: .7;
+    font-size: 13px;
+  }
+  .current-card {
+    background: linear-gradient(135deg, rgba(255,255,255,.1), rgba(255,255,255,.04));
+    backdrop-filter: blur(16px);
+    border-radius: 20px;
+    padding: 28px 24px;
+    border: 1px solid rgba(255,255,255,.08);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .current-main { display: flex; align-items: center; gap: 20px; }
+  .current-icon { font-size: 56px; line-height: 1; }
+  .current-temp {
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+  .current-temp span { font-size: 18px; font-weight: 400; opacity: .6; vertical-align: super; }
+  .current-desc { font-size: 16px; opacity: .8; margin-top: 2px; }
+  .current-details {
+    text-align: right;
+    font-size: 14px;
+    opacity: .7;
+    line-height: 1.8;
+  }
+  .current-details span { display: block; }
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    opacity: .7;
+    letter-spacing: 1px;
+  }
+  .forecast-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .forecast-card {
+    background: rgba(255,255,255,.06);
+    border-radius: 14px;
+    padding: 14px 8px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,.05);
+    transition: all .25s;
+  }
+  .forecast-card:hover {
+    background: rgba(255,255,255,.1);
+    transform: translateY(-2px);
+  }
+  .forecast-card .day { font-size: 13px; opacity: .5; margin-bottom: 6px; }
+  .forecast-card .icon { font-size: 28px; margin-bottom: 4px; }
+  .forecast-card .hi { font-size: 16px; font-weight: 600; }
+  .forecast-card .lo { font-size: 13px; opacity: .5; }
+  .forecast-card .rain { font-size: 11px; opacity: .5; margin-top: 4px; }
+  .loading {
+    text-align: center;
+    padding: 60px 0;
+    opacity: .5;
+    font-size: 15px;
+  }
+  .error-msg {
+    text-align: center;
+    padding: 40px 0;
+    color: #ff8a80;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+  @media (max-width: 500px) {
+    body { padding: 16px 12px; }
+    .current-card { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .current-details { text-align: left; width: 100%; display: flex; gap: 16px; flex-wrap: wrap; }
+    .current-details span { display: inline; }
+    .forecast-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🌤️ 新北天氣 <small>New Taipei</small></h1>
+    <div class="select-wrap">
+      <select id="districtSelect"></select>
+    </div>
+  </div>
+
+  <div id="currentSection" class="current-card">
+    <div class="current-main">
+      <div class="current-icon" id="currentIcon">☀️</div>
+      <div>
+        <div class="current-temp" id="currentTemp">--<span>°C</span></div>
+        <div class="current-desc" id="currentDesc">載入中…</div>
+      </div>
+    </div>
+    <div class="current-details">
+      <span>💧 濕度 <strong id="currentHumidity">--</strong></span>
+      <span>🌬️ 風速 <strong id="currentWind">--</strong></span>
+      <span>🤚 體感 <strong id="currentFeels">--</strong></span>
+    </div>
+  </div>
+
+  <div class="section-title">📅 未來 7 天預報</div>
+  <div class="forecast-grid" id="forecastGrid">
+    <div class="loading">載入天氣資料中…</div>
+  </div>
+</div>
+
+<script>
+const DISTRICTS = [
+  { name: '板橋區', lat: 25.0111, lng: 121.4598 },
+  { name: '三重區', lat: 25.0617, lng: 121.4879 },
+  { name: '中和區', lat: 25.0012, lng: 121.4989 },
+  { name: '永和區', lat: 25.0080, lng: 121.5196 },
+  { name: '新莊區', lat: 25.0368, lng: 121.4480 },
+  { name: '新店區', lat: 24.9478, lng: 121.5398 },
+  { name: '樹林區', lat: 24.9922, lng: 121.4162 },
+  { name: '鶯歌區', lat: 24.9550, lng: 121.3496 },
+  { name: '三峽區', lat: 24.9326, lng: 121.3739 },
+  { name: '淡水區', lat: 25.1740, lng: 121.4436 },
+  { name: '汐止區', lat: 25.0675, lng: 121.6589 },
+  { name: '瑞芳區', lat: 25.1078, lng: 121.8090 },
+  { name: '土城區', lat: 24.9748, lng: 121.4506 },
+  { name: '蘆洲區', lat: 25.0872, lng: 121.4746 },
+  { name: '五股區', lat: 25.0831, lng: 121.4414 },
+  { name: '泰山區', lat: 25.0345, lng: 121.4312 },
+  { name: '林口區', lat: 25.0806, lng: 121.3956 },
+  { name: '深坑區', lat: 25.0021, lng: 121.6185 },
+  { name: '石碇區', lat: 24.9925, lng: 121.6603 },
+  { name: '坪林區', lat: 24.9375, lng: 121.7132 },
+  { name: '三芝區', lat: 25.2593, lng: 121.5020 },
+  { name: '石門區', lat: 25.2950, lng: 121.5642 },
+  { name: '八里區', lat: 25.1487, lng: 121.4038 },
+  { name: '平溪區', lat: 25.0241, lng: 121.7413 },
+  { name: '雙溪區', lat: 25.0342, lng: 121.8690 },
+  { name: '貢寮區', lat: 25.0198, lng: 121.9210 },
+  { name: '金山區', lat: 25.2214, lng: 121.6352 },
+  { name: '萬里區', lat: 25.1661, lng: 121.6743 },
+  { name: '烏來區', lat: 24.8654, lng: 121.5516 },
+];
+
+const WMO = {
+  0:  ['☀️', '晴朗'],
+  1:  ['🌤️', '多雲時晴'],
+  2:  ['⛅', '多雲'],
+  3:  ['☁️', '陰天'],
+  45: ['🌫️', '霧'],
+  48: ['🌫️', '霧淞'],
+  51: ['🌦️', '小毛毛雨'],
+  53: ['🌦️', '毛毛雨'],
+  55: ['🌧️', '大毛毛雨'],
+  61: ['🌦️', '小雨'],
+  63: ['🌧️', '中雨'],
+  65: ['🌧️', '大雨'],
+  71: ['🌨️', '小雪'],
+  73: ['🌨️', '中雪'],
+  75: ['❄️', '大雪'],
+  80: ['🌦️', '陣雨'],
+  81: ['🌧️', '中陣雨'],
+  82: ['🌧️', '大陣雨'],
+  95: ['⛈️', '雷雨'],
+  96: ['⛈️', '冰雹雷雨'],
+  99: ['⛈️', '強雷雨'],
+};
+
+function getWeather(code) {
+  return WMO[code] || ['🌈', '未知'];
+}
+
+function getDayName(dateStr) {
+  const d = new Date(dateStr);
+  const days = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+  const today = new Date();
+  const diff = Math.round((d - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
+  if (diff === 0) return '今天';
+  if (diff === 1) return '明天';
+  if (diff === 2) return '後天';
+  return days[d.getDay()];
+}
+
+const select = document.getElementById('districtSelect');
+DISTRICTS.forEach((d, i) => {
+  const opt = document.createElement('option');
+  opt.value = i;
+  opt.textContent = d.name;
+  select.appendChild(opt);
+});
+
+async function fetchWeather(district) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${district.lat}&longitude=${district.lng}` +
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
+    `&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max` +
+    `&timezone=Asia%2FTaipei&forecast_days=8`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('無法取得天氣資料');
+  return res.json();
+}
+
+function renderCurrent(data, district) {
+  const c = data.current;
+  const [icon, desc] = getWeather(c.weather_code);
+
+  document.getElementById('currentIcon').textContent = icon;
+  document.getElementById('currentTemp').innerHTML = `${Math.round(c.temperature_2m)}<span>°C</span>`;
+  document.getElementById('currentDesc').textContent = `${district.name} · ${desc}`;
+  document.getElementById('currentHumidity').textContent = `${c.relative_humidity_2m}%`;
+  document.getElementById('currentWind').textContent = `${c.wind_speed_10m} km/h`;
+  document.getElementById('currentFeels').textContent = `${Math.round(c.apparent_temperature)}°C`;
+}
+
+function renderForecast(data) {
+  const d = data.daily;
+  const grid = document.getElementById('forecastGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const [icon] = getWeather(d.weather_code[i + 1]);
+    const day = getDayName(d.time[i + 1]);
+    const card = document.createElement('div');
+    card.className = 'forecast-card';
+    card.innerHTML = `
+      <div class="day">${day}</div>
+      <div class="icon">${icon}</div>
+      <div class="hi">${Math.round(d.temperature_2m_max[i + 1])}°</div>
+      <div class="lo">${Math.round(d.temperature_2m_min[i + 1])}°</div>
+      <div class="rain">${d.precipitation_probability_max[i + 1] ?? '--'}% 🌧️</div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('forecastGrid').innerHTML = `<div class="error-msg">⚠️ ${msg}</div>`;
+  document.getElementById('currentDesc').textContent = '資料載入失敗';
+}
+
+async function loadWeather(index) {
+  const district = DISTRICTS[index];
+  const grid = document.getElementById('forecastGrid');
+  grid.innerHTML = '<div class="loading">🔄 載入天氣資料中…</div>';
+  try {
+    const data = await fetchWeather(district);
+    renderCurrent(data, district);
+    renderForecast(data);
+  } catch (e) {
+    showError('無法取得天氣資料，請稍後再試。<br>' + e.message);
+  }
+}
+
+select.addEventListener('change', () => loadWeather(parseInt(select.value)));
+loadWeather(0);
+</script>
+</body>
+</html>
