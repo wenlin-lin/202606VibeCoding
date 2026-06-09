@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>番茄鐘計時器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Noto Sans TC', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    color: #fff;
+  }
+  .container {
+    background: rgba(255,255,255,.07);
+    backdrop-filter: blur(12px);
+    border-radius: 32px;
+    padding: 48px 40px;
+    width: 400px;
+    max-width: 94vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    text-align: center;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    opacity: .85;
+    margin-bottom: 28px;
+  }
+  .mode-tabs {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: 28px;
+  }
+  .mode-tab {
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: none;
+    background: rgba(255,255,255,.08);
+    color: rgba(255,255,255,.55);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all .25s;
+  }
+  .mode-tab:hover { background: rgba(255,255,255,.14); }
+  .mode-tab.active {
+    background: #e74c3c;
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(231,76,60,.4);
+  }
+  .timer-ring {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    margin: 0 auto 24px;
+  }
+  .timer-ring svg {
+    transform: rotate(-90deg);
+    width: 100%;
+    height: 100%;
+  }
+  .timer-ring .bg-circle {
+    fill: none;
+    stroke: rgba(255,255,255,.1);
+    stroke-width: 6;
+  }
+  .timer-ring .progress-circle {
+    fill: none;
+    stroke: #e74c3c;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset .4s ease;
+  }
+  .timer-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  .timer-text .time {
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-text .phase-label {
+    font-size: 14px;
+    opacity: .55;
+    margin-top: 4px;
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+  .btn {
+    padding: 12px 32px;
+    border-radius: 30px;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    min-width: 100px;
+  }
+  .btn-primary {
+    background: #e74c3c;
+    color: #fff;
+    box-shadow: 0 4px 18px rgba(231,76,60,.35);
+  }
+  .btn-primary:hover { background: #c0392b; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-secondary {
+    background: rgba(255,255,255,.1);
+    color: #fff;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,.2); }
+  .btn-secondary:disabled { opacity: .3; cursor: not-allowed; transform: none; }
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 36px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,.08);
+    font-size: 14px;
+    opacity: .65;
+  }
+  .stats span { display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🍅 番茄鐘</h1>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="pomodoro">專注</button>
+    <button class="mode-tab" data-mode="shortBreak">短休息</button>
+    <button class="mode-tab" data-mode="longBreak">長休息</button>
+  </div>
+
+  <div class="timer-ring">
+    <svg viewBox="0 0 100 100">
+      <circle class="bg-circle" cx="50" cy="50" r="45"/>
+      <circle class="progress-circle" cx="50" cy="50" r="45"
+              stroke-dasharray="282.743" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-text">
+      <div class="time" id="display">25:00</div>
+      <div class="phase-label" id="phaseLabel">專注時間</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="mainBtn">開始</button>
+    <button class="btn btn-secondary" id="resetBtn">重設</button>
+  </div>
+
+  <div class="stats">
+    <span>🍅 完成 <strong id="pomodoroCount">0</strong></span>
+    <span>⏱️ 當前 <strong id="currentRound">專注</strong></span>
+  </div>
+</div>
+
+<script>
+const CIRCUMFERENCE = 282.743;
+const config = {
+  pomodoro: 25 * 60,
+  shortBreak: 5 * 60,
+  longBreak: 15 * 60,
+};
+
+let state = {
+  mode: 'pomodoro',
+  timeLeft: config.pomodoro,
+  isRunning: false,
+  timerId: null,
+  completedPomodoros: 0,
+  currentRound: 1,
+};
+
+function formatTime(seconds) {
+  const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function updateDisplay() {
+  document.getElementById('display').textContent = formatTime(state.timeLeft);
+  const progress = 1 - state.timeLeft / config[state.mode];
+  const offset = CIRCUMFERENCE * (1 - progress);
+  document.querySelector('.progress-circle').style.strokeDashoffset = offset;
+  const labelMap = { pomodoro: '專注時間', shortBreak: '短休息', longBreak: '長休息' };
+  document.getElementById('phaseLabel').textContent = labelMap[state.mode];
+  document.getElementById('currentRound').textContent = state.mode === 'pomodoro' ? `第 ${state.currentRound} 輪` : '休息';
+}
+
+function switchMode(mode) {
+  if (state.isRunning) return;
+  state.mode = mode;
+  state.timeLeft = config[mode];
+  document.querySelectorAll('.mode-tab').forEach(tab =>
+    tab.classList.toggle('active', tab.dataset.mode === mode)
+  );
+  document.getElementById('mainBtn').textContent = '開始';
+  state.isRunning = false;
+  if (state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+  const color = mode === 'pomodoro' ? '#e74c3c' : '#27ae60';
+  document.querySelector('.progress-circle').style.stroke = color;
+  document.querySelector('.mode-tab.active').style.background = color;
+  document.querySelector('.mode-tab.active').style.boxShadow =
+    `0 4px 15px ${color}66`;
+  document.getElementById('mainBtn').style.background = color;
+  document.getElementById('mainBtn').style.boxShadow = `0 4px 18px ${color}66`;
+  updateDisplay();
+}
+
+function tick() {
+  state.timeLeft--;
+  updateDisplay();
+  if (state.timeLeft <= 0) {
+    clearInterval(state.timerId);
+    state.timerId = null;
+    state.isRunning = false;
+    document.getElementById('mainBtn').textContent = '開始';
+    if (state.mode === 'pomodoro') {
+      state.completedPomodoros++;
+      state.currentRound++;
+      document.getElementById('pomodoroCount').textContent = state.completedPomodoros;
+      document.title = '🍅 時間到！休息一下吧';
+    } else {
+      document.title = '🍅 休息結束，繼續專注！';
+    }
+    new Notification('🍅 番茄鐘', {
+      body: state.mode === 'pomodoro' ? '專注時間結束！休息一下吧 🎉' : '休息結束！開始下一輪專注 💪',
+    });
+    // auto-switch
+    if (state.mode === 'pomodoro') {
+      if (state.currentRound % 4 === 0) switchMode('longBreak');
+      else switchMode('shortBreak');
+    } else {
+      switchMode('pomodoro');
+    }
+  }
+}
+
+document.getElementById('mainBtn').addEventListener('click', () => {
+  if (state.timeLeft <= 0) return;
+  if (state.isRunning) {
+    clearInterval(state.timerId);
+    state.timerId = null;
+    state.isRunning = false;
+    document.getElementById('mainBtn').textContent = '繼續';
+    document.title = '🍅 暫停中';
+  } else {
+    state.isRunning = true;
+    state.timerId = setInterval(tick, 1000);
+    document.getElementById('mainBtn').textContent = '暫停';
+    document.title = `🍅 ${formatTime(state.timeLeft)}`;
+  }
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+  state.isRunning = false;
+  state.timeLeft = config[state.mode];
+  document.getElementById('mainBtn').textContent = '開始';
+  updateDisplay();
+  document.title = '🍅 番茄鐘';
+});
+
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchMode(tab.dataset.mode));
+});
+
+// Update title every second when running
+setInterval(() => {
+  if (state.isRunning) {
+    document.title = `🍅 ${formatTime(state.timeLeft)}`;
+  }
+}, 1000);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !state.isRunning) {
+    document.title = '🍅 番茄鐘';
+  }
+});
+
+// Init
+switchMode('pomodoro');
+</script>
+</body>
+</html>
